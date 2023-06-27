@@ -20,7 +20,10 @@ export default class Sketch{
     
     this.camera.position.z = 1
 
-    this.renderer = new THREE.WebGLRenderer( { antialias: true } )
+    this.renderer = new THREE.WebGLRenderer( { 
+      antialias: true,
+      alpha: true 
+    })
 
     this.container.appendChild( this.renderer.domElement )
 
@@ -47,7 +50,7 @@ export default class Sketch{
 
   addObjects () {
     this.geometry = new THREE.PlaneBufferGeometry(1, 1, 40, 40)
-    this.geometry = new THREE.SphereGeometry(0.4, 40, 40)
+    // this.geometry = new THREE.SphereGeometry(0.4, 40, 40)
 
     this.material = new THREE.ShaderMaterial({
       uniforms: {
