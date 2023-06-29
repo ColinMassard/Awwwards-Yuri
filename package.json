@@ -1,5 +1,7 @@
 {
   "dependencies": {
+    "fontfaceobserver": "^2.3.0",
+    "imagesloaded": "^5.0.0",
     "parcel": "^2.9.3",
     "three": "^0.153.0"
   },

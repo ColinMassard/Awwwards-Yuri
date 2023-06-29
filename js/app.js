@@ -1,4 +1,6 @@
 import * as THREE from 'three'
+import imagesLoaded from 'imagesloaded'
+import FontFaceObserver from 'fontfaceobserver'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
 import fragment from './shaders/mesh-fragment.glsl'
@@ -31,10 +33,39 @@ export default class Sketch{
 
     this.controls = new OrbitControls( this.camera, this.renderer.domElement )
 
-    this.resize()
-    this.setupResize()
-    this.addObjects()
-    this.render()
+    this.images = [...document.querySelectorAll('img')]
+
+    const fontOpen = new Promise(resolve => {
+      new FontFaceObserver("Open Sans").load().then(() => {
+        resolve();
+      });
+    });
+
+    const fontPlayfair = new Promise(resolve => {
+      new FontFaceObserver("Playfair Display").load().then(() => {
+        resolve();
+      });
+    });
+
+    // Preload images
+    const preloadImages = new Promise((resolve, reject) => {
+        imagesLoaded(document.querySelectorAll("img"), { background: true }, resolve);
+    });
+
+    let allDone = [fontOpen, fontPlayfair, preloadImages]
+
+    Promise.all(allDone).then(()=>{
+      this.addImages()
+      this.setPosition()
+      this.resize()
+      this.setupResize()
+      this.addObjects()
+      this.render()
+      // window.addEventListener('scroll',()=>{
+      //     this.currentScroll = window.scrollY;
+      //     this.setPosition();
+      // })
+  })
   }
 
   setupResize () {
@@ -67,6 +98,42 @@ export default class Sketch{
 
     this.mesh = new THREE.Mesh( this.geometry, this.material )
     this.scene.add( this.mesh )
+  }
+
+  setPosition () {
+    this.imageStore.forEach(o => {
+      o.mesh.position.y = o.top + this.height / 2 - o.height / 2
+      o.mesh.position.x = o.left + this.width / 2 + o.width / 2
+    })
+  }
+
+  addImages () {
+    this.imageStore = this.images.map(img => {
+      let bounds = img.getBoundingClientRect()
+
+      let geometry = new THREE.PlaneBufferGeometry(bounds.width,bounds.height,10,10);
+
+      let texture = new THREE.Texture(img)
+      texture.needsUpdate = true
+
+      let material = new THREE.MeshBasicMaterial({
+        map: texture
+      })
+
+      let mesh = new THREE.Mesh(geometry, material)
+
+      this.scene.add(mesh)
+
+
+      return {
+        img: img,
+        mesh: mesh,
+        top: bounds.top,
+        left: bounds.left,
+        width: bounds.width,
+        height: bounds.height
+    }
+    }) 
   }
 
   render () {
