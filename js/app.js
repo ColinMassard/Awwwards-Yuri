@@ -10,16 +10,14 @@ import ocean from '../img/ocean.jpg'
 
 export default class Sketch{
   constructor (options) {
+    this.time = 0
     this.container = options.dom
+    this.scene = new THREE.Scene()
 
     this.height = this.container.offsetHeight
     this.width = this.container.offsetWidth
 
-    this.scene = new THREE.Scene()
     this.camera = new THREE.PerspectiveCamera( 70, this.width / this.height, 100, 2000 )
-    
-    this.time = 0
-    
     this.camera.position.z = 600
 
     this.camera.fov =  2 * Math.atan(this.height / 2 / 600) * (180 / Math.PI)
@@ -102,8 +100,8 @@ export default class Sketch{
 
   setPosition () {
     this.imageStore.forEach(o => {
-      o.mesh.position.y = o.top + this.height / 2 - o.height / 2
-      o.mesh.position.x = o.left + this.width / 2 + o.width / 2
+      o.mesh.position.y = -o.top + this.height / 2 - o.height / 2
+      o.mesh.position.x = o.left - this.width / 2 + o.width / 2
     })
   }
 
@@ -111,8 +109,7 @@ export default class Sketch{
     this.imageStore = this.images.map(img => {
       let bounds = img.getBoundingClientRect()
 
-      let geometry = new THREE.PlaneBufferGeometry(bounds.width,bounds.height,10,10);
-
+      let geometry = new THREE.PlaneBufferGeometry(bounds.width,bounds.height,1,1);
       let texture = new THREE.Texture(img)
       texture.needsUpdate = true
 
