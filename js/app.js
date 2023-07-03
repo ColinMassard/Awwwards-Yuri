@@ -118,7 +118,12 @@ export default class Sketch{
 
       let geometry = new THREE.PlaneGeometry(bounds.width, bounds.height, 10, 10);
 
-      let texture = new THREE.Texture(img)
+      // let texture = new THREE.Texture(img)
+      // TO DO: Not to use deprecated down Us the following code instead
+
+      let image = new Image();
+      image.src = img.src;
+      let texture = new THREE.Texture(image);
 
       texture.needsUpdate = true
 
