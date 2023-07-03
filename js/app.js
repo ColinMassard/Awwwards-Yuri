@@ -2,6 +2,8 @@ import * as THREE from 'three'
 import imagesLoaded from 'imagesloaded'
 import FontFaceObserver from 'fontfaceobserver'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import Scroll from './scroll';
+
 
 import fragment from './shaders/mesh-fragment.glsl'
 import vertex from './shaders/mesh-vertex.glsl'
@@ -51,14 +53,18 @@ export default class Sketch{
     });
 
     let allDone = [fontOpen, fontPlayfair, preloadImages]
+    this.currentScroll = 0;
+
 
     Promise.all(allDone).then(()=>{
+      this.scroll = new Scroll()
       this.addImages()
       this.setPosition()
       this.resize()
       this.setupResize()
-      this.addObjects()
+      // this.addObjects()
       this.render()
+
       // window.addEventListener('scroll',()=>{
       //     this.currentScroll = window.scrollY;
       //     this.setPosition();
@@ -71,12 +77,11 @@ export default class Sketch{
   }
 
   resize () {
-    this.height = this.container.offsetHeight
     this.width = this.container.offsetWidth
-
+    this.height = this.container.offsetHeight
     this.renderer.setSize( this.width, this.height )
     this.camera.aspect = this.width / this.height
-    this.camera.updateProjectionMatrix();
+    this.camera.updateProjectionMatrix()
   }
 
   addObjects () {
@@ -99,18 +104,22 @@ export default class Sketch{
   }
 
   setPosition () {
-    this.imageStore.forEach(o => {
-      o.mesh.position.y = -o.top + this.height / 2 - o.height / 2
-      o.mesh.position.x = o.left - this.width / 2 + o.width / 2
+    this.imageStore.forEach(o=>{
+      o.mesh.position.y = this.currentScroll -o.top + this.height/2 - o.height/2
+      o.mesh.position.x = o.left - this.width/2 + o.width/2
     })
   }
 
   addImages () {
     this.imageStore = this.images.map(img => {
       let bounds = img.getBoundingClientRect()
+      console.log(bounds)
+      console.log(img)
 
-      let geometry = new THREE.PlaneBufferGeometry(bounds.width,bounds.height,1,1);
+      let geometry = new THREE.PlaneGeometry(bounds.width, bounds.height, 10, 10);
+
       let texture = new THREE.Texture(img)
+
       texture.needsUpdate = true
 
       let material = new THREE.MeshBasicMaterial({
@@ -129,16 +138,16 @@ export default class Sketch{
         left: bounds.left,
         width: bounds.width,
         height: bounds.height
-    }
+      }
     }) 
   }
 
   render () {
     this.time+=0.05
-    this.mesh.rotation.x = this.time / 2000;
-    this.mesh.rotation.y = this.time / 1000;
-  
-    this.material.uniforms.time.value = this.time
+
+    this.scroll.render()
+    this.currentScroll = this.scroll.scrollToRender
+    this.setPosition()
 
     this.renderer.render( this.scene, this.camera )
 
