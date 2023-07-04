@@ -7,6 +7,7 @@ import Scroll from './scroll';
 
 
 import fragment from './shaders/mesh-fragment.glsl'
+import noise from './shaders/mesh-noise.glsl'
 import vertex from './shaders/mesh-vertex.glsl'
 
 import ocean from '../img/ocean.jpg'
@@ -36,6 +37,8 @@ export default class Sketch{
       alpha: true 
     })
 
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio,2))
+
     this.container.appendChild( this.renderer.domElement )
 
     this.controls = new OrbitControls( this.camera, this.renderer.domElement )
@@ -60,6 +63,8 @@ export default class Sketch{
     });
 
     let allDone = [fontOpen, fontPlayfair, preloadImages]
+
+    this.previousScroll = 0
     this.currentScroll = 0
     this.raycaster = new THREE.Raycaster()
     this.pointer = new THREE.Vector2()
@@ -94,6 +99,7 @@ export default class Sketch{
       uniforms: {
         "tDiffuse": { value: null },
         "scrollSpeed": { value: null },
+        "time": { value: null },
       },
       vertexShader: `
       varying vec2 vUv;
@@ -108,13 +114,18 @@ export default class Sketch{
       uniform sampler2D tDiffuse;
       varying vec2 vUv;
       uniform float scrollSpeed;
+      uniform float time;
+      ${noise}
       void main(){
         vec2 newUV = vUv;
-        float area = smoothstep(0.4,0.,vUv.y);
-        area = pow(area,4.);
+        float area = smoothstep(1.,0.8,vUv.y)*2. - 1.;
+        // area = pow(area,4.);
+        float noise = 0.5*(cnoise(vec3(vUv*10.,time/5.)) + 1.);
+        float n = smoothstep(0.5,0.51,noise + area);
         newUV.x -= (vUv.x - 0.5)*0.1*area*scrollSpeed;
         gl_FragColor = texture2D( tDiffuse, newUV);
-      //   gl_FragColor = vec4(area,0.,0.,1.);
+        // gl_FragColor = vec4(n,0.,0.,1.);
+        gl_FragColor = mix(vec4(1.), texture2D( tDiffuse, newUV), n);
       }
       `
     }
@@ -223,14 +234,16 @@ export default class Sketch{
       img.addEventListener('mouseenter', () =>{
         GSAP.to(material.uniforms.hoverState, {
           duration: 1,
-          value: 1
+          value: 1,
+          ease: "power3.out"
         })
       })
 
       img.addEventListener('mouseout', () =>{
         GSAP.to(material.uniforms.hoverState, {
           duration: 1,
-          value: 0
+          value: 0,
+          ease: "power3.out"
         })
       })
 
@@ -254,22 +267,34 @@ export default class Sketch{
     }) 
   }
 
-  render () {
-    this.time+=0.05
+  render(){
+    this.time+=0.05;
+    
+    this.scroll.render();
+    this.previousScroll = this.currentScroll
 
-    this.scroll.render()
-    this.currentScroll = this.scroll.scrollToRender
-    this.setPosition()
-    this.customPass.uniforms.scrollSpeed.value = this.scroll.speedTarget;
+    this.currentScroll = this.scroll.scrollToRender;
+    
 
-    this.materials.forEach(m=>{
-      m.uniforms.time.value = this.time;
-    })
 
-    // this.renderer.render( this.scene, this.camera )
-    this.composer.render()
+    // if(Math.round(this.currentScroll)!==Math.round(this.previousScroll)){
+        // console.log('should render');
+        this.setPosition();
+        this.customPass.uniforms.scrollSpeed.value = this.scroll.speedTarget;
+        this.customPass.uniforms.time.value = this.time;
 
-    window.requestAnimationFrame(this.render.bind(this))
+        // this.material.uniforms.time.value = this.time;
+
+        this.materials.forEach(m=>{
+            m.uniforms.time.value = this.time;
+        })
+
+        // this.renderer.render( this.scene, this.camera );
+        this.composer.render()
+    // }
+
+    
+    window.requestAnimationFrame(this.render.bind(this));
   }
 }
 
