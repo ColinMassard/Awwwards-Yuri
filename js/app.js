@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import imagesLoaded from 'imagesloaded'
+import GSAP from 'gsap'
 import FontFaceObserver from 'fontfaceobserver'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import Scroll from './scroll';
@@ -9,6 +10,12 @@ import fragment from './shaders/mesh-fragment.glsl'
 import vertex from './shaders/mesh-vertex.glsl'
 
 import ocean from '../img/ocean.jpg'
+
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+
 
 export default class Sketch{
   constructor (options) {
@@ -53,16 +60,20 @@ export default class Sketch{
     });
 
     let allDone = [fontOpen, fontPlayfair, preloadImages]
-    this.currentScroll = 0;
-
+    this.currentScroll = 0
+    this.raycaster = new THREE.Raycaster()
+    this.pointer = new THREE.Vector2()
 
     Promise.all(allDone).then(()=>{
       this.scroll = new Scroll()
       this.addImages()
       this.setPosition()
+
+      this.mouseMovement()
       this.resize()
       this.setupResize()
       // this.addObjects()
+      this.composerPass()
       this.render()
 
       // window.addEventListener('scroll',()=>{
@@ -71,6 +82,68 @@ export default class Sketch{
       // })
   })
   }
+
+  composerPass(){
+    this.composer = new EffectComposer(this.renderer);
+    this.renderPass = new RenderPass(this.scene, this.camera);
+    this.composer.addPass(this.renderPass);
+
+    //custom shader pass
+    var counter = 0.0;
+    this.myEffect = {
+      uniforms: {
+        "tDiffuse": { value: null },
+        "scrollSpeed": { value: null },
+      },
+      vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix 
+          * modelViewMatrix 
+          * vec4( position, 1.0 );
+      }
+      `,
+      fragmentShader: `
+      uniform sampler2D tDiffuse;
+      varying vec2 vUv;
+      uniform float scrollSpeed;
+      void main(){
+        vec2 newUV = vUv;
+        float area = smoothstep(0.4,0.,vUv.y);
+        area = pow(area,4.);
+        newUV.x -= (vUv.x - 0.5)*0.1*area*scrollSpeed;
+        gl_FragColor = texture2D( tDiffuse, newUV);
+      //   gl_FragColor = vec4(area,0.,0.,1.);
+      }
+      `
+    }
+
+    this.customPass = new ShaderPass(this.myEffect);
+    this.customPass.renderToScreen = true;
+
+    this.composer.addPass(this.customPass);
+  }
+  
+  mouseMovement () {
+    window.addEventListener('mousemove', (event)=> {
+      this.pointer.x = ( event.clientX / this.width ) * 2 - 1;
+      this.pointer.y = - ( event.clientY / this.width ) * 2 + 1;
+
+      // update the picking ray with the camera and pointer position
+      this.raycaster.setFromCamera( this.pointer, this.camera );
+
+      // calculate objects intersecting the picking ray
+      const intersects = this.raycaster.intersectObjects( this.scene.children );
+
+      if(intersects.length>0) {
+        // console.log(intersects[0])
+        let obj = intersects[0].object
+        obj.material.uniforms.hover.value = intersects[0].uv
+      }
+    }, false)
+  }
+
 
   setupResize () {
     window.addEventListener('resize', this.resize.bind(this))
@@ -111,25 +184,59 @@ export default class Sketch{
   }
 
   addImages () {
+    this.material = new THREE.ShaderMaterial({
+      uniforms: {
+        time: {value: 0},
+        uImage: {value: 0},
+        hover: {value: new THREE.Vector2(0.5, 0.5)},
+        hoverState: {value: 0},
+        oceanTexture: {value: new THREE.TextureLoader().load(ocean)}
+      },
+      side: THREE.DoubleSide,
+      fragmentShader: fragment,
+      vertexShader: vertex,
+      // wireframe: true
+    })
+
+    this.materials = []
+
     this.imageStore = this.images.map(img => {
       let bounds = img.getBoundingClientRect()
-      console.log(bounds)
-      console.log(img)
 
       let geometry = new THREE.PlaneGeometry(bounds.width, bounds.height, 10, 10);
 
       // let texture = new THREE.Texture(img)
       // TO DO: Not to use deprecated down Us the following code instead
 
-      let image = new Image();
-      image.src = img.src;
-      let texture = new THREE.Texture(image);
+      let image = new Image()
+      image.src = img.src
+      let texture = new THREE.Texture(image)
 
       texture.needsUpdate = true
 
-      let material = new THREE.MeshBasicMaterial({
-        map: texture
+      // let material = new THREE.MeshBasicMaterial({
+      //   map: texture
+      // })
+
+      let material = this.material.clone()
+
+      img.addEventListener('mouseenter', () =>{
+        GSAP.to(material.uniforms.hoverState, {
+          duration: 1,
+          value: 1
+        })
       })
+
+      img.addEventListener('mouseout', () =>{
+        GSAP.to(material.uniforms.hoverState, {
+          duration: 1,
+          value: 0
+        })
+      })
+
+      this.materials.push(material)
+
+      material.uniforms.uImage.value = texture;
 
       let mesh = new THREE.Mesh(geometry, material)
 
@@ -154,7 +261,12 @@ export default class Sketch{
     this.currentScroll = this.scroll.scrollToRender
     this.setPosition()
 
-    this.renderer.render( this.scene, this.camera )
+    this.materials.forEach(m=>{
+      m.uniforms.time.value = this.time;
+    })
+
+    // this.renderer.render( this.scene, this.camera )
+    this.composer.render()
 
     window.requestAnimationFrame(this.render.bind(this))
   }
