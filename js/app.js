@@ -260,6 +260,7 @@ export default class Sketch{
     this.scroll.render()
     this.currentScroll = this.scroll.scrollToRender
     this.setPosition()
+    this.customPass.uniforms.scrollSpeed.value = this.scroll.speedTarget;
 
     this.materials.forEach(m=>{
       m.uniforms.time.value = this.time;
